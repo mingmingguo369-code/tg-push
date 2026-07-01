@@ -1,0 +1,16 @@
+{
+  "name": "tg-broadcaster",
+  "version": "1.0.0",
+  "description": "Telegram 頻道圖文推播工具",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

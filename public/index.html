@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>日進斗金</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0e0b06;
+    --bg2: #15110a;
+    --panel: #1c1710;
+    --panel2: #241d13;
+    --line: #3a2f1c;
+    --gold: #e8b339;
+    --gold-soft: #f2c94c;
+    --gold-dim: #8a6f3a;
+    --text: #f5efe2;
+    --muted: #9a8e76;
+    --danger: #d05a4a;
+    --ok: #5bb073;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Noto Sans TC", system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 500px at 80% -10%, rgba(232,179,57,0.08), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 22px 26px 18px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  header .logo {
+    font-weight: 900;
+    font-size: 22px;
+    letter-spacing: 2px;
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold-dim));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header .sub { color: var(--muted); font-size: 13px; }
+
+  .wrap {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 22px;
+    padding: 22px 26px 60px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; }
+    .preview-col { order: -1; }
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .card h2 {
+    margin: 0 0 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+  label:first-of-type { margin-top: 0; }
+
+  input[type="text"], input[type="password"], textarea, select {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--text);
+    padding: 11px 12px;
+    font-family: inherit;
+    font-size: 14px;
+    transition: border-color .15s;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--gold);
+  }
+  textarea { resize: vertical; min-height: 90px; line-height: 1.5; }
+  select { cursor: pointer; }
+
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    transition: transform .08s, filter .15s, background .15s;
+  }
+  button:active { transform: translateY(1px); }
+  .btn-gold {
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+    color: #2a1c00;
+    padding: 11px 16px;
+    font-size: 14px;
+  }
+  .btn-gold:hover { filter: brightness(1.06); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+  .btn-ghost:hover { border-color: var(--gold-dim); color: var(--text); }
+  .btn-danger {
+    background: transparent;
+    border: 1px solid #5a2c26;
+    color: var(--danger);
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  .btn-danger:hover { background: rgba(208,90,74,0.1); }
+
+  .verify-tag {
+    font-size: 12px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    display: inline-block;
+  }
+  .verify-ok { background: rgba(91,176,115,0.14); color: var(--ok); }
+  .verify-bad { background: rgba(208,90,74,0.14); color: var(--danger); }
+
+  /* 貼文卡 */
+  .post {
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .post-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .post-num {
+    font-weight: 900;
+    color: var(--gold);
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+
+  /* 拖拉區 */
+  .drop {
+    border: 1.5px dashed var(--line);
+    border-radius: 10px;
+    padding: 22px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .drop:hover { border-color: var(--gold-dim); }
+  .drop.over { border-color: var(--gold); background: rgba(232,179,57,0.06); }
+  .thumb-wrap { position: relative; display: inline-block; }
+  .thumb {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 10px;
+    display: block;
+  }
+  .thumb-x {
+    position: absolute;
+    top: 6px; right: 6px;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    font-size: 15px;
+    line-height: 26px;
+    border: none;
+  }
+  .counter { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
+  .counter.over { color: var(--danger); }
+
+  /* 按鈕編輯 */
+  .btn-edit-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .btn-edit-row input { flex: 1; }
+  .opt-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .opt-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--gold); }
+
+  /* 預覽 */
+  .preview-col { position: sticky; top: 22px; align-self: start; }
+  .tg-card {
+    background: #17212b;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  }
+  .tg-img { width: 100%; display: block; background: #0e1621; }
+  .tg-body { padding: 10px 12px; }
+  .tg-caption { color: #fff; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .tg-empty { color: #5a6b7b; font-size: 13px; padding: 20px; text-align: center; }
+  .tg-btn-row { display: flex; border-top: 1px solid rgba(255,255,255,0.06); }
+  .tg-btn {
+    flex: 1;
+    background: rgba(255,255,255,0.08);
+    color: #6ab3f3;
+    text-align: center;
+    padding: 9px;
+    font-size: 13px;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tg-btn:first-child { border-left: none; }
+
+  /* 發送 */
+  .send-bar { position: sticky; bottom: 0; }
+  #sendBtn { width: 100%; padding: 15px; font-size: 16px; }
+  #sendBtn:disabled { filter: grayscale(.6) brightness(.7); cursor: not-allowed; }
+  .progress { margin-top: 12px; font-size: 13px; color: var(--gold-soft); display: none; }
+  .results { margin-top: 12px; font-size: 13px; display: none; }
+  .res-line { padding: 6px 10px; border-radius: 8px; margin-bottom: 5px; }
+  .res-ok { background: rgba(91,176,115,0.12); color: var(--ok); }
+  .res-bad { background: rgba(208,90,74,0.12); color: var(--danger); }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">日進斗金</span>
+  <span class="sub">Telegram 頻道圖文推播</span>
+</header>
+
+<div class="wrap">
+  <!-- 左：控制 -->
+  <div class="control-col">
+    <!-- 共用設定 -->
+    <div class="card">
+      <h2>① 共用設定</h2>
+
+      <label>頁面密碼</label>
+      <input type="password" id="password" placeholder="輸入頁面密碼" />
+      <div class="hint" style="margin-top:6px">部署時設定的密碼。輸入後會自動讀取雲端設定。</div>
+
+      <label>頻道 / 會員 ID（一行一個，可混填）</label>
+      <textarea id="channels" placeholder="@weile8888888（頻道）&#10;-1001234567890（私密頻道）&#10;123456789（會員數字 ID，會私訊本人）" style="min-height:80px"></textarea>
+      <div class="hint">填 @帳號 → 發頻道；填數字 ID → 私訊該會員（會員需先對發送的 bot 按過 Start）。兩種可混在一起。</div>
+
+      <label>每次發送之間的間隔</label>
+      <select id="interval">
+        <option value="1">1 秒</option>
+        <option value="2">2 秒</option>
+        <option value="3">3 秒</option>
+      </select>
+      <div class="hint" style="margin-top:6px">私發大量會員時，每位之間會停這麼久，避免被 Telegram 限流。</div>
+
+      <div class="row" style="margin-top:14px">
+        <button class="btn-gold" id="saveLocalBtn">💾 存這台電腦</button>
+        <button class="btn-gold" id="saveCloudBtn">☁ 存跨電腦</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn-ghost" id="loadCloudBtn">☁ 讀取雲端</button>
+        <button class="btn-ghost" id="exportBtn">⬇ 匯出</button>
+        <button class="btn-ghost" id="importBtn">⬆ 匯入</button>
+      </div>
+      <div class="hint">「存這台電腦」只存這台瀏覽器；「存跨電腦」存到雲端，別台開啟輸入密碼按「讀取雲端」就帶回同一份。</div>
+    </div>
+
+    <!-- 機器人 -->
+    <div class="card">
+      <h2>② 機器人（配額輪替）</h2>
+      <label>總配額（自動平均分給每支機器人）</label>
+      <input type="text" inputmode="numeric" id="totalQuota" value="30" style="max-width:160px" />
+      <div class="hint" id="quotaHint" style="margin-top:6px"></div>
+      <div id="bots" style="margin-top:14px"></div>
+      <button class="btn-ghost" id="addBot" style="width:100%; margin-top:6px">＋ 新增機器人</button>
+      <div class="hint">系統會把總配額平均分給每支:例如總配額 30、3 支 → 每支輪流發 10 則就換下一支。每支都要是上面頻道的管理員。</div>
+    </div>
+
+    <!-- 收集 ID -->
+    <div class="card">
+      <h2>③ 收集 ID（互動過的帳號）</h2>
+      <div class="hint" style="margin-bottom:10px">讓帳號對下面選的 bot 私訊一句話，或在 bot 所在的群組發言（bot 需關閉隱私模式或設為管理員），再按「讀取」就會列出它們的數字 ID。</div>
+      <div class="row">
+        <select id="collectBot" style="flex:3"></select>
+        <button class="btn-ghost" id="collectBtn" style="flex:1">讀取</button>
+      </div>
+      <div id="collectResult" style="margin-top:10px"></div>
+    </div>
+
+    <!-- 貼文們 -->
+    <div class="card">
+      <h2>④ 貼文內容</h2>
+      <div id="posts"></div>
+      <button class="btn-ghost" id="addPost" style="width:100%; margin-top:6px">＋ 再加一則</button>
+    </div>
+
+    <!-- 發送 -->
+    <div class="card send-bar">
+      <button class="btn-gold" id="sendBtn">🚀 發送全部</button>
+      <div class="progress" id="progress"></div>
+      <div class="results" id="results"></div>
+    </div>
+  </div>
+
+  <!-- 右：預覽 -->
+  <div class="preview-col">
+    <div class="card">
+      <h2>即時預覽</h2>
+      <div id="preview"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,var(--gold-soft),var(--gold));color:#2a1c00;padding:11px 22px;border-radius:30px;font-weight:700;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;z-index:99;">✓ 已儲存</div>
+
+<script>
+// ---------- 狀態 ----------
+let posts = [];
+let postId = 0;
+let bots = [];
+let botRowId = 0;
+
+function newPost() {
+  return { id: ++postId, imageBase64: "", fileName: "", mediaType: "image", caption: "", buttons: [{ text: "", url: "" }], pin: false, btnPerRow: 2 };
+}
+function mediaTypeOf(file) {
+  if (file.type.startsWith("video")) return "video";
+  if (file.type === "image/gif") return "gif";
+  return "image";
+}
+function chunkRows(arr, n) {
+  const rows = [];
+  for (let i = 0; i < arr.length; i += n) rows.push(arr.slice(i, i + n));
+  return rows;
+}
+function newBot() {
+  return { id: ++botRowId, token: "", name: "", verified: false };
+}
+
+// ---------- 機器人清單 ----------
+function renderBots() {
+  const wrap = document.getElementById("bots");
+  wrap.innerHTML = "";
+  bots.forEach((b, idx) => {
+    const el = document.createElement("div");
+    el.className = "post";
+    el.style.padding = "14px";
+    el.innerHTML = `
+      <div class="post-head">
+        <span class="post-num">機器人 ${idx + 1}</span>
+        ${bots.length > 1 ? `<button class="btn-danger" data-bact="delbot" data-id="${b.id}">刪除</button>` : ""}
+      </div>
+      <label>Bot Token</label>
+      <div class="row">
+        <input type="text" data-bact="token" data-id="${b.id}" placeholder="123456:AAxxxx..." value="${(b.token || "").replace(/"/g, "&quot;")}" style="flex:3" />
+        <button class="btn-ghost" data-bact="verify" data-id="${b.id}" style="flex:1">驗證</button>
+      </div>
+      <div data-btag="${b.id}">${b.verified ? `<span class="verify-tag verify-ok">✓ ${b.name}</span>` : ""}</div>
+    `;
+    wrap.appendChild(el);
+  });
+  updateQuotaHint();
+  updateCollectBotOptions();
+  saveSettings();
+}
+function updateCollectBotOptions() {
+  const sel = document.getElementById("collectBot");
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = "";
+  bots.forEach((b, idx) => {
+    if (!b.token.trim()) return;
+    const opt = document.createElement("option");
+    opt.value = b.id;
+    opt.textContent = b.name ? b.name : `機器人 ${idx + 1}`;
+    sel.appendChild(opt);
+  });
+  if (!sel.options.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "（先填好機器人 token）";
+    sel.appendChild(opt);
+  } else if (prev) {
+    sel.value = prev;
+  }
+}
+function updateQuotaHint() {
+  const hint = document.getElementById("quotaHint");
+  if (!hint) return;
+  const total = Math.max(1, Number(document.getElementById("totalQuota").value) || bots.length);
+  const per = Math.ceil(total / (bots.length || 1));
+  hint.textContent = `目前 ${bots.length} 支 → 每支輪流發約 ${per} 則就換下一支`;
+}
+function getBot(id) { return bots.find((b) => b.id === id); }
+
+document.getElementById("bots").addEventListener("click", async (e) => {
+  const act = e.target.dataset.bact;
+  if (!act) return;
+  const id = Number(e.target.dataset.id);
+  if (act === "delbot") { bots = bots.filter((b) => b.id !== id); renderBots(); }
+  if (act === "verify") {
+    const b = getBot(id);
+    const tag = document.querySelector(`[data-btag="${id}"]`);
+    if (!b.token) { tag.innerHTML = `<span class="verify-tag verify-bad">先填 token</span>`; return; }
+    tag.innerHTML = `<span class="verify-tag">驗證中…</span>`;
+    try {
+      const r = await fetch("/api/verify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: b.token, password: document.getElementById("password").value }),
+      });
+      const d = await r.json();
+      if (d.ok) { b.verified = true; b.name = `${d.name}（@${d.username}）`; tag.innerHTML = `<span class="verify-tag verify-ok">✓ ${b.name}</span>`; saveSettings(); }
+      else { b.verified = false; tag.innerHTML = `<span class="verify-tag verify-bad">✗ ${d.error}</span>`; }
+    } catch { tag.innerHTML = `<span class="verify-tag verify-bad">✗ 連線失敗</span>`; }
+  }
+});
+document.getElementById("bots").addEventListener("input", (e) => {
+  const act = e.target.dataset.bact;
+  if (!act) return;
+  const b = getBot(Number(e.target.dataset.id));
+  if (!b) return;
+  if (act === "token") { b.token = e.target.value; b.verified = false; }
+  saveSettings();
+});
+document.getElementById("totalQuota").addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/[^0-9]/g, "");
+  updateQuotaHint();
+  saveSettings();
+});
+document.getElementById("addBot").onclick = () => { bots.push(newBot()); renderBots(); };
+
+// ---------- 收集 ID ----------
+document.getElementById("collectBtn").onclick = async () => {
+  const sel = document.getElementById("collectBot");
+  const box = document.getElementById("collectResult");
+  const b = getBot(Number(sel.value));
+  if (!b || !b.token.trim()) { box.innerHTML = `<div class="res-line res-bad">先在上面填好機器人 token</div>`; return; }
+  box.innerHTML = `<div class="res-line">讀取中…</div>`;
+  try {
+    const r = await fetch("/api/collect-ids", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: b.token.trim(), password: document.getElementById("password").value }),
+    });
+    const d = await r.json();
+    if (!d.ok) { box.innerHTML = `<div class="res-line res-bad">✗ ${d.error}</div>`; return; }
+    if (!d.users.length) {
+      box.innerHTML = `<div class="res-line res-bad">沒讀到任何人。請先讓帳號對這支 bot 私訊一句話、或在 bot 所在的群組發言，再按一次讀取。</div>`;
+      return;
+    }
+    window._collectedUsers = d.users;
+    const rows = d.users.map((u) =>
+      `<div class="res-line res-ok">${u.id}　${u.username ? "@" + u.username : ""}　${u.name || ""}</div>`
+    ).join("");
+    box.innerHTML = `
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">讀到 ${d.users.length} 個帳號：</div>
+      ${rows}
+      <button class="btn-gold" id="addToListBtn" style="width:100%;margin-top:10px">↑ 全部加入發送名單</button>
+    `;
+    document.getElementById("addToListBtn").onclick = () => {
+      const ta = document.getElementById("channels");
+      const existing = ta.value.split("\n").map((s) => s.trim()).filter(Boolean);
+      const ids = window._collectedUsers.map((u) => String(u.id));
+      const merged = [...new Set([...existing, ...ids])];
+      ta.value = merged.join("\n");
+      saveSettings();
+      showToast(`✓ 已加入 ${ids.length} 個 ID`);
+    };
+  } catch (e) {
+    box.innerHTML = `<div class="res-line res-bad">連線失敗：${e}</div>`;
+  }
+};
+
+// ---------- localStorage（記住機器人 / 頻道 / 間隔）----------
+function saveSettings() {
+  localStorage.setItem("tg_bots", JSON.stringify(bots.map((b) => ({ token: b.token, name: b.name, verified: b.verified }))));
+  localStorage.setItem("tg_channels", document.getElementById("channels").value);
+  localStorage.setItem("tg_interval", document.getElementById("interval").value);
+  localStorage.setItem("tg_totalquota", document.getElementById("totalQuota").value);
+}
+function loadSettings() {
+  const savedBots = localStorage.getItem("tg_bots");
+  const c = localStorage.getItem("tg_channels");
+  const i = localStorage.getItem("tg_interval");
+  const q = localStorage.getItem("tg_totalquota");
+  if (savedBots) {
+    try {
+      const arr = JSON.parse(savedBots);
+      if (Array.isArray(arr) && arr.length) bots = arr.map((b) => ({ id: ++botRowId, token: b.token || "", name: b.name || "", verified: !!b.verified }));
+    } catch {}
+  }
+  if (c) document.getElementById("channels").value = c;
+  if (i) document.getElementById("interval").value = i;
+  if (q) document.getElementById("totalQuota").value = q;
+}
+
+// ---------- 渲染貼文卡 ----------
+function renderPosts() {
+  const wrap = document.getElementById("posts");
+  wrap.innerHTML = "";
+  posts.forEach((p, idx) => {
+    const el = document.createElement("div");
+    el.className = "post";
+    el.innerHTML = `
+      <div class="post-head">
+        <span class="post-num">貼文 ${idx + 1}</span>
+        ${posts.length > 1 ? `<button class="btn-danger" data-act="delpost" data-id="${p.id}">刪除這則</button>` : ""}
+      </div>
+
+      <div class="dropzone" data-id="${p.id}">
+        ${p.imageBase64
+          ? `<div class="thumb-wrap">${p.mediaType === "video"
+              ? `<video class="thumb" src="${p.imageBase64}" muted autoplay loop playsinline></video>`
+              : `<img class="thumb" src="${p.imageBase64}" />`}<button class="thumb-x" data-act="delimg" data-id="${p.id}">×</button></div>`
+          : `<div class="drop" data-act="pick" data-id="${p.id}">拖拉圖片／影片／GIF 到這裡，或點此選檔<br><span style="font-size:11px">沒檔也可以，會以純文字發送</span></div>`}
+      </div>
+
+      <label>文案</label>
+      <textarea data-act="caption" data-id="${p.id}" placeholder="輸入文案，支援 &lt;b&gt;粗體&lt;/b&gt;">${p.caption.replace(/</g, "&lt;")}</textarea>
+      <div class="counter ${p.caption.length > 1024 ? "over" : ""}">${p.caption.length} / 1024</div>
+
+      <label>按鈕</label>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--muted)">每排</span>
+        <select data-act="perrow" data-id="${p.id}" style="max-width:90px;padding:6px 8px">
+          <option value="1" ${p.btnPerRow === 1 ? "selected" : ""}>1 顆</option>
+          <option value="2" ${p.btnPerRow === 2 ? "selected" : ""}>2 顆</option>
+          <option value="3" ${p.btnPerRow === 3 ? "selected" : ""}>3 顆</option>
+        </select>
+        <span style="font-size:12px;color:var(--muted)">並排</span>
+      </div>
+      <div data-btns="${p.id}"></div>
+      <button class="btn-ghost" data-act="addbtn" data-id="${p.id}" style="margin-top:8px">＋ 加一顆按鈕</button>
+
+      <div class="opt-row">
+        <input type="checkbox" data-act="pin" data-id="${p.id}" ${p.pin ? "checked" : ""} />
+        <span>發送後自動置頂（bot 需有置頂權限）</span>
+      </div>
+    `;
+    wrap.appendChild(el);
+
+    // 按鈕列
+    const btnWrap = el.querySelector(`[data-btns="${p.id}"]`);
+    p.buttons.forEach((b, bi) => {
+      const r = document.createElement("div");
+      r.className = "btn-edit-row";
+      r.innerHTML = `
+        <input type="text" placeholder="按鈕文字（如 官網鏈接）" data-act="btntext" data-id="${p.id}" data-bi="${bi}" value="${(b.text || "").replace(/"/g, "&quot;")}" />
+        <input type="text" placeholder="連結 https://..." data-act="btnurl" data-id="${p.id}" data-bi="${bi}" value="${(b.url || "").replace(/"/g, "&quot;")}" />
+        <button class="btn-danger" data-act="delbtn" data-id="${p.id}" data-bi="${bi}">×</button>
+      `;
+      btnWrap.appendChild(r);
+    });
+  });
+  bindDropzones();
+  renderPreview();
+}
+
+// ---------- 預覽 ----------
+function renderPreview() {
+  const wrap = document.getElementById("preview");
+  wrap.innerHTML = "";
+  posts.forEach((p) => {
+    const card = document.createElement("div");
+    card.className = "tg-card";
+    const btns = p.buttons.filter((b) => b.text && b.url);
+    if (!p.imageBase64 && !p.caption && btns.length === 0) {
+      card.innerHTML = `<div class="tg-empty">（空白貼文）</div>`;
+    } else {
+      card.innerHTML = `
+        ${p.imageBase64 ? (p.mediaType === "video"
+          ? `<video class="tg-img" src="${p.imageBase64}" muted autoplay loop playsinline></video>`
+          : `<img class="tg-img" src="${p.imageBase64}" />`) : ""}
+        ${p.caption ? `<div class="tg-body"><div class="tg-caption">${p.caption.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div></div>` : ""}
+        ${chunkRows(btns, p.btnPerRow || 1).map((row) =>
+          `<div class="tg-btn-row">${row.map((b) => `<div class="tg-btn">${b.text.replace(/</g, "&lt;")}</div>`).join("")}</div>`
+        ).join("")}
+      `;
+    }
+    wrap.appendChild(card);
+  });
+}
+
+// ---------- 拖拉 / 選圖 ----------
+function fileToBase64(file, cb) {
+  const reader = new FileReader();
+  reader.onload = () => cb(reader.result, file.name);
+  reader.readAsDataURL(file);
+}
+function bindDropzones() {
+  document.querySelectorAll(".dropzone").forEach((zone) => {
+    const id = Number(zone.dataset.id);
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); const d = zone.querySelector(".drop"); if (d) d.classList.add("over"); });
+    zone.addEventListener("dragleave", () => { const d = zone.querySelector(".drop"); if (d) d.classList.remove("over"); });
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (file && (file.type.startsWith("image/") || file.type.startsWith("video/"))) {
+        const mt = mediaTypeOf(file);
+        fileToBase64(file, (b64, name) => { const p = getPost(id); p.imageBase64 = b64; p.fileName = name; p.mediaType = mt; renderPosts(); });
+      }
+    });
+  });
+}
+function pickImage(id) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*,video/*";
+  input.onchange = () => {
+    const file = input.files[0];
+    if (file) { const mt = mediaTypeOf(file); fileToBase64(file, (b64, name) => { const p = getPost(id); p.imageBase64 = b64; p.fileName = name; p.mediaType = mt; renderPosts(); }); }
+  };
+  input.click();
+}
+
+// ---------- 改某則貼文的欄位 ----------
+function getPost(id) { return posts.find((p) => p.id === id); }
+function setPost(id, key, val) { const p = getPost(id); if (p) { p[key] = val; renderPosts(); } }
+
+// ---------- 事件代理 ----------
+document.getElementById("posts").addEventListener("click", (e) => {
+  const act = e.target.dataset.act;
+  const id = Number(e.target.dataset.id);
+  if (act === "pick") pickImage(id);
+  if (act === "delimg") { setPost(id, "imageBase64", ""); setPost(id, "fileName", ""); }
+  if (act === "delpost") { posts = posts.filter((p) => p.id !== id); renderPosts(); }
+  if (act === "addbtn") { getPost(id).buttons.push({ text: "", url: "" }); renderPosts(); }
+  if (act === "delbtn") { const bi = Number(e.target.dataset.bi); getPost(id).buttons.splice(bi, 1); renderPosts(); }
+});
+document.getElementById("posts").addEventListener("input", (e) => {
+  const act = e.target.dataset.act;
+  const id = Number(e.target.dataset.id);
+  const p = getPost(id);
+  if (!p) return;
+  if (act === "caption") { p.caption = e.target.value; renderPreview();
+    const c = e.target.parentElement.querySelector(".counter"); if (c) { c.textContent = p.caption.length + " / 1024"; c.classList.toggle("over", p.caption.length > 1024); } }
+  if (act === "btntext") { p.buttons[Number(e.target.dataset.bi)].text = e.target.value; renderPreview(); }
+  if (act === "btnurl") { p.buttons[Number(e.target.dataset.bi)].url = e.target.value; }
+});
+document.getElementById("posts").addEventListener("change", (e) => {
+  if (e.target.dataset.act === "pin") getPost(Number(e.target.dataset.id)).pin = e.target.checked;
+  if (e.target.dataset.act === "perrow") { getPost(Number(e.target.dataset.id)).btnPerRow = Number(e.target.value); renderPreview(); }
+});
+
+document.getElementById("addPost").onclick = () => { posts.push(newPost()); renderPosts(); };
+
+// ---------- 發送 ----------
+document.getElementById("sendBtn").onclick = async () => {
+  const btn = document.getElementById("sendBtn");
+  const prog = document.getElementById("progress");
+  const resBox = document.getElementById("results");
+  const validBots = bots.filter((b) => b.token.trim()).map((b) => ({ token: b.token.trim(), name: b.name }));
+  const channels = document.getElementById("channels").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  const interval = document.getElementById("interval").value;
+
+  resBox.style.display = "none"; resBox.innerHTML = "";
+  if (!validBots.length) { alert("至少要有一支機器人並填好 token"); return; }
+  if (!channels.length) { alert("先填至少一個頻道"); return; }
+  if (!posts.length) { alert("至少要有一則貼文"); return; }
+
+  const over = posts.find((p) => p.caption.length > 1024);
+  if (over) { alert("有貼文文案超過 1024 字，Telegram 會擋，請先縮短"); return; }
+
+  saveSettings();
+  btn.disabled = true;
+  prog.style.display = "block";
+  prog.textContent = `發送中…共 ${posts.length} 則 × ${channels.length} 個頻道，由 ${validBots.length} 支機器人輪替`;
+
+  try {
+    const r = await fetch("/api/send", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bots: validBots, channels, interval,
+        totalQuota: document.getElementById("totalQuota").value,
+        password: document.getElementById("password").value,
+        posts: posts.map((p) => ({
+          imageBase64: p.imageBase64, fileName: p.fileName, mediaType: p.mediaType,
+          caption: p.caption, pin: p.pin,
+          buttons: chunkRows(p.buttons.filter((b) => b.text && b.url), p.btnPerRow || 1).map((row) => row.map((b) => ({ text: b.text, url: b.url }))),
+        })),
+      }),
+    });
+    const d = await r.json();
+    prog.style.display = "none";
+    resBox.style.display = "block";
+    if (d.error) { resBox.innerHTML = `<div class="res-line res-bad">${d.error}</div>`; }
+    else {
+      resBox.innerHTML = d.results.map((x) =>
+        `<div class="res-line ${x.ok ? "res-ok" : "res-bad"}">貼文 ${x.post} → ${x.channel}（${x.bot}）：${x.ok ? "✓ 成功" : "✗ " + x.error}</div>`
+      ).join("");
+    }
+  } catch (e) {
+    prog.style.display = "none";
+    resBox.style.display = "block";
+    resBox.innerHTML = `<div class="res-line res-bad">連線失敗：${e}</div>`;
+  }
+  btn.disabled = false;
+};
+
+// ---------- 啟動 ----------
+loadSettings();
+const savedPw = localStorage.getItem("tg_password");
+if (savedPw) document.getElementById("password").value = savedPw;
+if (!bots.length) bots.push(newBot());
+renderBots();
+posts.push(newPost());
+renderPosts();
+// 有密碼就自動拉雲端設定（換電腦打開輸入密碼後也會自動帶回）
+if (savedPw) loadFromCloud(true);
+
+// ---------- 儲存 / 匯出 / 匯入 ----------
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.opacity = "1";
+  t.style.transform = "translateX(-50%) translateY(-6px)";
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => {
+    t.style.opacity = "0";
+    t.style.transform = "translateX(-50%)";
+  }, 1600);
+}
+
+function currentConfig() {
+  return {
+    bots: bots.map((b) => ({ token: b.token, name: b.name, verified: b.verified })),
+    channels: document.getElementById("channels").value,
+    interval: document.getElementById("interval").value,
+    totalQuota: document.getElementById("totalQuota").value,
+  };
+}
+function applyConfig(d) {
+  if (!d) return;
+  if (Array.isArray(d.bots) && d.bots.length)
+    bots = d.bots.map((b) => ({ id: ++botRowId, token: b.token || "", name: b.name || "", verified: !!b.verified }));
+  if (typeof d.channels === "string") document.getElementById("channels").value = d.channels;
+  if (d.interval) document.getElementById("interval").value = d.interval;
+  if (d.totalQuota) document.getElementById("totalQuota").value = d.totalQuota;
+  renderBots();
+  saveSettings();
+}
+async function saveToCloud() {
+  try {
+    const r = await fetch("/api/save-config", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: document.getElementById("password").value, config: currentConfig() }),
+    });
+    const d = await r.json();
+    return d.ok;
+  } catch { return false; }
+}
+async function loadFromCloud(silent) {
+  try {
+    const r = await fetch("/api/load-config", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: document.getElementById("password").value }),
+    });
+    const d = await r.json();
+    if (d.ok && d.config) { applyConfig(d.config); if (!silent) showToast("✓ 已讀取雲端設定"); return true; }
+    if (!d.ok && !silent) showToast("✗ " + (d.error || "密碼錯誤"));
+    return false;
+  } catch { return false; }
+}
+
+document.getElementById("saveLocalBtn").onclick = () => { saveSettings(); showToast("✓ 已存這台電腦"); };
+document.getElementById("saveCloudBtn").onclick = async () => {
+  saveSettings();
+  const ok = await saveToCloud();
+  showToast(ok ? "✓ 已存雲端（跨電腦）" : "✗ 雲端失敗，確認密碼對不對");
+};
+document.getElementById("loadCloudBtn").onclick = () => loadFromCloud(false);
+document.getElementById("password").addEventListener("blur", () => {
+  localStorage.setItem("tg_password", document.getElementById("password").value);
+  loadFromCloud(true);
+});
+
+document.getElementById("exportBtn").onclick = () => {
+  const data = {
+    bots: bots.map((b) => ({ token: b.token, name: b.name, verified: b.verified })),
+    channels: document.getElementById("channels").value,
+    interval: document.getElementById("interval").value,
+    totalQuota: document.getElementById("totalQuota").value,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "tg-settings.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast("✓ 已匯出設定檔");
+};
+
+document.getElementById("importBtn").onclick = () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const d = JSON.parse(reader.result);
+        if (Array.isArray(d.bots) && d.bots.length)
+          bots = d.bots.map((b) => ({ id: ++botRowId, token: b.token || "", name: b.name || "", verified: !!b.verified }));
+        if (typeof d.channels === "string") document.getElementById("channels").value = d.channels;
+        if (d.interval) document.getElementById("interval").value = d.interval;
+        if (d.totalQuota) document.getElementById("totalQuota").value = d.totalQuota;
+        renderBots();
+        saveSettings();
+        showToast("✓ 已匯入設定");
+      } catch {
+        showToast("✗ 檔案格式不對");
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+};
+</script>
+</body>
+</html>
