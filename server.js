@@ -253,7 +253,8 @@ app.post("/api/import-message", async (req, res) => {
       const m =
         u.message || u.edited_message || u.channel_post || u.edited_channel_post;
       if (!m) continue;
-      if ((m.text && m.text.length) || (m.caption && m.caption.length)) picked = m;
+      if ((m.text && m.text.length) || (m.caption && m.caption.length) ||
+          (m.photo && m.photo.length) || m.video || m.animation) picked = m;
     }
     if (!picked) {
       return res.json({
@@ -265,7 +266,40 @@ app.post("/api/import-message", async (req, res) => {
     const text = hasText ? picked.text : picked.caption;
     const entities = hasText ? picked.entities : picked.caption_entities;
     const html = entitiesToHtml(text || "", entities || []);
-    res.json({ ok: true, html });
+
+    // 附帶媒體：photo(取最大尺寸) / video / animation(GIF)
+    let mediaDataUrl = "", mediaType = "image", fileId = "";
+    if (picked.photo && picked.photo.length) {
+      fileId = picked.photo[picked.photo.length - 1].file_id; // 最大尺寸那張
+      mediaType = "image";
+    } else if (picked.video) {
+      fileId = picked.video.file_id;
+      mediaType = "video";
+    } else if (picked.animation) {
+      fileId = picked.animation.file_id;
+      mediaType = "gif";
+    }
+    if (fileId) {
+      try {
+        const fr = await fetch(TG(token, "getFile") + "?file_id=" + encodeURIComponent(fileId));
+        const fd = await fr.json();
+        if (fd.ok && fd.result && fd.result.file_path) {
+          const fp = fd.result.file_path;
+          const dl = await fetch(`https://api.telegram.org/file/bot${token}/${fp}`);
+          const buf = Buffer.from(await dl.arrayBuffer());
+          let mime;
+          if (mediaType === "video" || mediaType === "gif") {
+            mime = "video/mp4"; // Telegram 影片/GIF(animation) 實際皆為 mp4
+          } else if (/\.png$/i.test(fp)) mime = "image/png";
+          else if (/\.webp$/i.test(fp)) mime = "image/webp";
+          else mime = "image/jpeg";
+          mediaDataUrl = `data:${mime};base64,${buf.toString("base64")}`;
+        }
+      } catch (e) {
+        mediaDataUrl = ""; // 媒體下載失敗就只匯文案
+      }
+    }
+    res.json({ ok: true, html, mediaDataUrl, mediaType });
   } catch (e) {
     res.json({ ok: false, error: String(e) });
   }

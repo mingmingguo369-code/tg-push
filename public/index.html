@@ -738,7 +738,7 @@ function renderPosts() {
 
       <div class="dropzone" data-id="${p.id}">
         ${p.imageBase64
-          ? `<div class="thumb-wrap">${p.mediaType === "video"
+          ? `<div class="thumb-wrap">${/^data:video\//i.test(p.imageBase64)
               ? `<video class="thumb" src="${p.imageBase64}" muted autoplay loop playsinline></video>`
               : `<img class="thumb" src="${p.imageBase64}" />`}<button class="thumb-x" data-act="delimg" data-id="${p.id}">×</button></div>`
           : `<div class="drop" data-act="pick" data-id="${p.id}">拖拉圖片／影片／GIF 到這裡，或點此選檔<br><span style="font-size:11px">沒檔也可以，會以純文字發送</span></div>`}
@@ -798,7 +798,7 @@ function renderPreview() {
       card.innerHTML = `<div class="tg-empty">（空白貼文）</div>`;
     } else {
       card.innerHTML = `
-        ${p.imageBase64 ? (p.mediaType === "video"
+        ${p.imageBase64 ? (/^data:video\//i.test(p.imageBase64)
           ? `<video class="tg-img" src="${p.imageBase64}" muted autoplay loop playsinline></video>`
           : `<img class="tg-img" src="${p.imageBase64}" />`) : ""}
         ${p.caption ? `<div class="tg-body"><div class="tg-caption">${captionToPreview(p.caption)}</div></div>` : ""}
@@ -875,8 +875,14 @@ async function importFromTG(id) {
     const d = await r.json();
     if (!d.ok) { showToast("✗ " + d.error); return; }
     p.caption = d.html || "";
+    if (d.mediaDataUrl) {
+      p.imageBase64 = d.mediaDataUrl;
+      p.mediaType = d.mediaType || "image";
+      p.fileName = d.mediaType === "video" ? "tg-video.mp4"
+        : d.mediaType === "gif" ? "tg-anim.mp4" : "tg-image.jpg";
+    }
     renderPosts();
-    showToast("✓ 已從 TG 匯入文案");
+    showToast(d.mediaDataUrl ? "✓ 已從 TG 匯入圖文" : "✓ 已從 TG 匯入文案");
   } catch (e) {
     showToast("✗ 連線失敗");
   }
