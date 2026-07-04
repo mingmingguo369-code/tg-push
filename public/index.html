@@ -288,14 +288,11 @@
       <label>頻道 / 會員 ID（一行一個，可混填）</label>
       <textarea id="channels" placeholder="@weile8888888（頻道）&#10;-1001234567890（私密頻道）&#10;123456789（會員數字 ID，會私訊本人）" style="min-height:80px"></textarea>
       <div class="hint">填 @帳號 → 發頻道；填數字 ID → 私訊該會員（會員需先對發送的 bot 按過 Start）。兩種可混在一起。</div>
+      <button class="btn-ghost" id="importListBtn" style="margin-top:8px;width:100%">⬆ 匯入名單 TXT（自動抓數字 ID、略過名字/用戶名）</button>
 
-      <label>每次發送之間的間隔</label>
-      <select id="interval">
-        <option value="1">1 秒</option>
-        <option value="2">2 秒</option>
-        <option value="3">3 秒</option>
-      </select>
-      <div class="hint" style="margin-top:6px">私發大量會員時，每位之間會停這麼久，避免被 Telegram 限流。</div>
+      <label>每次發送之間的間隔（秒）</label>
+      <input type="text" inputmode="numeric" id="interval" value="2" style="max-width:160px" />
+      <div class="hint" style="margin-top:6px">每則／每位會員之間會停這麼多秒。私訊大量會員時建議調大（例如 3～5 秒以上）避免被 Telegram 限流。</div>
 
       <div class="row" style="margin-top:14px">
         <button class="btn-gold" id="saveLocalBtn">💾 存這台電腦</button>
@@ -540,6 +537,10 @@ document.getElementById("bots").addEventListener("input", (e) => {
 document.getElementById("totalQuota").addEventListener("input", (e) => {
   e.target.value = e.target.value.replace(/[^0-9]/g, "");
   updateQuotaHint();
+  saveSettings();
+});
+document.getElementById("interval").addEventListener("input", (e) => {
+  e.target.value = e.target.value.replace(/[^0-9]/g, "");
   saveSettings();
 });
 document.getElementById("addBot").onclick = () => { bots.push(newBot()); renderBots(); };
@@ -1056,6 +1057,43 @@ document.getElementById("password").addEventListener("blur", () => {
   localStorage.setItem("tg_password", document.getElementById("password").value);
   loadFromCloud(true);
 });
+
+// 匯入名單 TXT：每行可能混中文名 / @用戶名 / ID，只抓「整段都是數字」的 ID，避開雜訊
+document.getElementById("importListBtn").onclick = () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".txt,.csv,text/plain";
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || "");
+      // 依空白/逗號/分號/換行切成 token；只取「整段是數字」的（開頭非 0，避開電話；@用戶名含數字不會整段是數字所以自動略過）
+      const tokens = text.split(/[\s,;、，]+/).map((t) => t.trim()).filter(Boolean);
+      const ids = [];
+      let noise = 0;
+      for (const t of tokens) {
+        if (/^-?[1-9]\d{4,}$/.test(t)) ids.push(t);
+        else noise++;
+      }
+      const found = [...new Set(ids)];
+      if (!found.length) {
+        showToast("✗ 檔案裡沒抓到任何有效數字 ID");
+        return;
+      }
+      const ta = document.getElementById("channels");
+      const existing = ta.value.split("\n").map((s) => s.trim()).filter(Boolean);
+      const merged = [...new Set([...existing, ...found])];
+      const added = merged.length - existing.length;
+      ta.value = merged.join("\n");
+      saveSettings();
+      showToast(`✓ 抓到 ${found.length} 個 ID（新增 ${added}，略過雜訊 ${noise} 段）`);
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+};
 
 document.getElementById("exportBtn").onclick = () => {
   const data = currentConfig();
