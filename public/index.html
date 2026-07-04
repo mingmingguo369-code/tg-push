@@ -423,6 +423,14 @@ function captionToPreview(caption) {
     .replace(/</g, "&lt;")
     .replace(/\n/g, "<br>");
 }
+// Telegram 只計「解析後可見文字」長度：自訂表情只算內層 emoji、格式標籤不算
+function visibleLength(caption) {
+  const s = (caption || "")
+    .replace(/<tg-emoji[^>]*>(.*?)<\/tg-emoji>/gi, "$1")  // 保留內層 emoji
+    .replace(/<[^>]+>/g, "")                               // 移除其餘 HTML 標籤
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"); // 還原實體
+  return s.length;
+}
 
 function newPost() {
   return { id: ++postId, imageBase64: "", fileName: "", mediaType: "image", caption: "", buttons: [{ text: "", url: "" }], pin: false, btnPerRow: 2 };
@@ -631,7 +639,7 @@ function insertEmoji(em) {
     ta.focus();
     ta.setSelectionRange(pos, pos);
     const c = ta.parentElement.querySelector(".counter");
-    if (c) { c.textContent = p.caption.length + " / 1024"; c.classList.toggle("over", p.caption.length > 1024); }
+    if (c) { const vl = visibleLength(p.caption); c.textContent = vl + " / 1024"; c.classList.toggle("over", vl > 1024); }
   }
   renderPreview();
   saveSettings();
@@ -738,7 +746,7 @@ function renderPosts() {
 
       <label>文案</label>
       <textarea data-act="caption" data-id="${p.id}" placeholder="輸入文案，支援 &lt;b&gt;粗體&lt;/b&gt;">${p.caption.replace(/</g, "&lt;")}</textarea>
-      <div class="counter ${p.caption.length > 1024 ? "over" : ""}">${p.caption.length} / 1024</div>
+      <div class="counter ${visibleLength(p.caption) > 1024 ? "over" : ""}">${visibleLength(p.caption)} / 1024</div>
       <button class="btn-ghost" data-act="importmsg" data-id="${p.id}" style="margin-top:6px">⬇ 從 TG 匯入（含自訂表情/粗體）</button>
 
       <label>按鈕</label>
@@ -879,7 +887,7 @@ document.getElementById("posts").addEventListener("input", (e) => {
   const p = getPost(id);
   if (!p) return;
   if (act === "caption") { p.caption = e.target.value; renderPreview();
-    const c = e.target.parentElement.querySelector(".counter"); if (c) { c.textContent = p.caption.length + " / 1024"; c.classList.toggle("over", p.caption.length > 1024); } }
+    const c = e.target.parentElement.querySelector(".counter"); if (c) { const vl = visibleLength(p.caption); c.textContent = vl + " / 1024"; c.classList.toggle("over", vl > 1024); } }
   if (act === "btntext") { p.buttons[Number(e.target.dataset.bi)].text = e.target.value; renderPreview(); }
   if (act === "btnurl") { p.buttons[Number(e.target.dataset.bi)].url = e.target.value; }
 });
@@ -918,7 +926,7 @@ document.getElementById("sendBtn").onclick = async () => {
   if (!channels.length) { alert("先填至少一個頻道"); return; }
   if (!posts.length) { alert("至少要有一則貼文"); return; }
 
-  const over = posts.find((p) => p.caption.length > 1024);
+  const over = posts.find((p) => visibleLength(p.caption) > 1024);
   if (over) { alert("有貼文文案超過 1024 字，Telegram 會擋，請先縮短"); return; }
 
   saveSettings();
