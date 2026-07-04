@@ -562,6 +562,7 @@ document.getElementById("collectBtn").onclick = async () => {
       <div style="font-size:13px;color:var(--muted);margin-bottom:8px">讀到 ${d.users.length} 個帳號：</div>
       ${rows}
       <button class="btn-gold" id="addToListBtn" style="width:100%;margin-top:10px">↑ 全部加入發送名單</button>
+      <button class="btn-ghost" id="exportIdsTxtBtn" style="width:100%;margin-top:8px">⬇ 匯出 TXT</button>
     `;
     document.getElementById("addToListBtn").onclick = () => {
       const ta = document.getElementById("channels");
@@ -571,6 +572,18 @@ document.getElementById("collectBtn").onclick = async () => {
       ta.value = merged.join("\n");
       saveSettings();
       showToast(`✓ 已加入 ${ids.length} 個 ID`);
+    };
+    document.getElementById("exportIdsTxtBtn").onclick = () => {
+      const lines = window._collectedUsers.map((u) =>
+        u.id + (u.username ? "  @" + u.username : "") + (u.name ? "  " + u.name : "")
+      ).join("\n");
+      const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "collected-ids.txt";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast("✓ 已匯出 collected-ids.txt");
     };
   } catch (e) {
     box.innerHTML = `<div class="res-line res-bad">連線失敗：${e}</div>`;
