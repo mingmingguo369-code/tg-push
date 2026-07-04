@@ -183,6 +183,94 @@ app.post("/api/collect-emojis", async (req, res) => {
   }
 });
 
+// ---- 從 TG 訊息重建成 Telegram HTML（含自訂表情、粗體等）----
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/"/g, "&quot;");
+}
+// 依 entity 型別回傳 [開標籤, 閉標籤]；不支援的型別回 null（當純文字）
+function tagsForEntity(e) {
+  switch (e.type) {
+    case "bold": return ["<b>", "</b>"];
+    case "italic": return ["<i>", "</i>"];
+    case "underline": return ["<u>", "</u>"];
+    case "strikethrough": return ["<s>", "</s>"];
+    case "code": return ["<code>", "</code>"];
+    case "pre": return ["<pre>", "</pre>"];
+    case "text_link": return [`<a href="${escapeAttr(e.url || "")}">`, "</a>"];
+    case "custom_emoji": return [`<tg-emoji emoji-id="${escapeAttr(e.custom_emoji_id || "")}">`, "</tg-emoji>"];
+    default: return null; // mention / url / hashtag 等 → 保留純文字即可
+  }
+}
+// entity 的 offset/length 是 UTF-16 code unit，JS 字串本身就是 UTF-16，直接用 index 對應。
+// 用「邊界切段」法：在每個 entity 的起訖點切開，段內文字用當下作用中的標籤包起來，確保巢狀正確。
+function entitiesToHtml(text, entities) {
+  const ents = (entities || []).filter((e) => tagsForEntity(e) !== null);
+  const len = text.length;
+  if (!ents.length) return escapeHtml(text);
+
+  const bounds = new Set([0, len]);
+  for (const e of ents) {
+    bounds.add(e.offset);
+    bounds.add(e.offset + e.length);
+  }
+  const points = [...bounds].filter((b) => b >= 0 && b <= len).sort((a, b) => a - b);
+
+  let out = "";
+  for (let k = 0; k < points.length - 1; k++) {
+    const start = points[k], end = points[k + 1];
+    if (end <= start) continue;
+    const seg = text.substring(start, end);
+    // 找出完整涵蓋這一段的 entity；外層(長的)先開、後關
+    const active = ents
+      .filter((e) => e.offset <= start && e.offset + e.length >= end)
+      .sort((a, b) => b.length - a.length || a.offset - b.offset);
+    let open = "", close = "";
+    for (const e of active) {
+      const [o, c] = tagsForEntity(e);
+      open += o;
+      close = c + close;
+    }
+    out += open + escapeHtml(seg) + close;
+  }
+  return out;
+}
+
+// ---- 從 bot 收到的最後一則訊息，還原成 caption（HTML）----
+app.post("/api/import-message", async (req, res) => {
+  if (!checkPassword(req, res)) return;
+  const { token } = req.body;
+  if (!token) return res.json({ ok: false, error: "沒填 token" });
+  try {
+    const r = await fetch(TG(token, "getUpdates") + "?limit=100");
+    const data = await r.json();
+    if (!data.ok) return res.json({ ok: false, error: data.description });
+    // 取最後一則有 text 或 caption 的訊息（使用者轉發/傳給 bot 的）
+    let picked = null;
+    for (const u of data.result) {
+      const m =
+        u.message || u.edited_message || u.channel_post || u.edited_channel_post;
+      if (!m) continue;
+      if ((m.text && m.text.length) || (m.caption && m.caption.length)) picked = m;
+    }
+    if (!picked) {
+      return res.json({
+        ok: false,
+        error: "沒有找到含文字的訊息。請先把你在 TG 編排好的訊息「轉發」或直接傳給這支 bot，再按一次匯入。",
+      });
+    }
+    const hasText = picked.text != null;
+    const text = hasText ? picked.text : picked.caption;
+    const entities = hasText ? picked.entities : picked.caption_entities;
+    const html = entitiesToHtml(text || "", entities || []);
+    res.json({ ok: true, html });
+  } catch (e) {
+    res.json({ ok: false, error: String(e) });
+  }
+});
+
 // ---- 把一則貼文發到一個頻道 ----
 async function sendOne(token, channel, post) {
   const buttons = (post.buttons || [])

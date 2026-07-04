@@ -726,6 +726,7 @@ function renderPosts() {
       <label>文案</label>
       <textarea data-act="caption" data-id="${p.id}" placeholder="輸入文案，支援 &lt;b&gt;粗體&lt;/b&gt;">${p.caption.replace(/</g, "&lt;")}</textarea>
       <div class="counter ${p.caption.length > 1024 ? "over" : ""}">${p.caption.length} / 1024</div>
+      <button class="btn-ghost" data-act="importmsg" data-id="${p.id}" style="margin-top:6px">⬇ 從 TG 匯入（含自訂表情/粗體）</button>
 
       <label>按鈕</label>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -834,7 +835,31 @@ document.getElementById("posts").addEventListener("click", (e) => {
   if (act === "delpost") { posts = posts.filter((p) => p.id !== id); renderPosts(); }
   if (act === "addbtn") { getPost(id).buttons.push({ text: "", url: "" }); renderPosts(); }
   if (act === "delbtn") { const bi = Number(e.target.dataset.bi); getPost(id).buttons.splice(bi, 1); renderPosts(); }
+  if (act === "importmsg") importFromTG(id);
 });
+
+// 從 bot 收到的最後一則訊息，還原成本則的文案（含自訂表情/粗體）
+async function importFromTG(id) {
+  const p = getPost(id);
+  if (!p) return;
+  const sel = document.getElementById("collectBot");
+  const b = getBot(Number(sel && sel.value));
+  if (!b || !b.token.trim()) { showToast("先在「收集 ID」那欄選一支填好 token 的 bot"); return; }
+  showToast("匯入中…");
+  try {
+    const r = await fetch("/api/import-message", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: b.token.trim(), password: document.getElementById("password").value }),
+    });
+    const d = await r.json();
+    if (!d.ok) { showToast("✗ " + d.error); return; }
+    p.caption = d.html || "";
+    renderPosts();
+    showToast("✓ 已從 TG 匯入文案");
+  } catch (e) {
+    showToast("✗ 連線失敗");
+  }
+}
 document.getElementById("posts").addEventListener("input", (e) => {
   const act = e.target.dataset.act;
   const id = Number(e.target.dataset.id);
