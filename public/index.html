@@ -248,6 +248,24 @@
   .res-ok { background: rgba(91,176,115,0.12); color: var(--ok); }
   .res-bad { background: rgba(208,90,74,0.12); color: var(--danger); }
   .hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+  /* 自訂表情面板 */
+  .emoji-panel { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .emoji-item {
+    width: 40px; height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--bg2);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; line-height: 1;
+    overflow: hidden;
+    padding: 0;
+  }
+  .emoji-item:hover { border-color: var(--gold); }
+  .emoji-item img, .emoji-item video {
+    width: 40px; height: 40px; object-fit: contain; display: block; background: transparent;
+  }
 </style>
 </head>
 <body>
@@ -313,6 +331,17 @@
       <div id="collectResult" style="margin-top:10px"></div>
     </div>
 
+    <!-- 自訂表情 -->
+    <div class="card">
+      <h2>✨ 自訂表情</h2>
+      <div class="hint" style="margin-bottom:10px">先讓帳號把想用的自訂表情（Premium 大表情）傳給下面選的 bot、或在 bot 所在群組發過，再按「讀取」抓回真實表情圖。點某顆表情會插到目前游標所在的文案框。</div>
+      <div class="row">
+        <select id="emojiBot" style="flex:3"></select>
+        <button class="btn-ghost" id="emojiBtn" style="flex:1">讀取</button>
+      </div>
+      <div id="emojiPanel" class="emoji-panel"></div>
+    </div>
+
     <!-- 貼文們 -->
     <div class="card">
       <h2>④ 貼文內容</h2>
@@ -345,6 +374,55 @@ let posts = [];
 let postId = 0;
 let bots = [];
 let botRowId = 0;
+let emojiList = [];          // 自訂表情清單 [{ id, emoji, dataUrl, kind }]
+let focusedCaptionId = null; // 目前聚焦的文案框對應貼文 id
+
+// 把按鈕網址補成合法 URL（與後端 normalizeUrl 一致）
+function normalizeUrl(u) {
+  if (!u) return u;
+  u = u.trim();
+  if (u.startsWith("@")) return "https://t.me/" + u.slice(1);
+  if (/^t\.me\//i.test(u)) return "https://" + u;
+  if (/^https?:\/\//i.test(u)) return u;
+  if (/^tg:\/\//i.test(u)) return u;
+  if (/^[\w.-]+\.[a-z]{2,}/i.test(u)) return "https://" + u;
+  return u;
+}
+
+// 把一則貼文整理成可儲存的物件（includeMedia=false 時不含 imageBase64，供 localStorage 退存）
+function postsForStorage(includeMedia) {
+  return posts.map((p) => ({
+    imageBase64: includeMedia ? p.imageBase64 : "",
+    fileName: p.fileName,
+    mediaType: p.mediaType,
+    caption: p.caption,
+    buttons: (p.buttons || []).map((b) => ({ text: b.text || "", url: b.url || "" })),
+    pin: p.pin,
+    btnPerRow: p.btnPerRow,
+  }));
+}
+// 把儲存的貼文物件還原成完整 post（配新 id、補預設）
+function hydratePost(p) {
+  return {
+    id: ++postId,
+    imageBase64: p.imageBase64 || "",
+    fileName: p.fileName || "",
+    mediaType: p.mediaType || "image",
+    caption: p.caption || "",
+    buttons: Array.isArray(p.buttons) && p.buttons.length
+      ? p.buttons.map((b) => ({ text: b.text || "", url: b.url || "" }))
+      : [{ text: "", url: "" }],
+    pin: !!p.pin,
+    btnPerRow: p.btnPerRow || 2,
+  };
+}
+// 預覽用：把 <tg-emoji ...>X</tg-emoji> 還原成 X，再 escape，最後換行
+function captionToPreview(caption) {
+  return (caption || "")
+    .replace(/<tg-emoji\b[^>]*>([\s\S]*?)<\/tg-emoji>/gi, "$1")
+    .replace(/</g, "&lt;")
+    .replace(/\n/g, "<br>");
+}
 
 function newPost() {
   return { id: ++postId, imageBase64: "", fileName: "", mediaType: "image", caption: "", buttons: [{ text: "", url: "" }], pin: false, btnPerRow: 2 };
@@ -389,8 +467,7 @@ function renderBots() {
   updateCollectBotOptions();
   saveSettings();
 }
-function updateCollectBotOptions() {
-  const sel = document.getElementById("collectBot");
+function fillBotOptions(sel) {
   if (!sel) return;
   const prev = sel.value;
   sel.innerHTML = "";
@@ -409,6 +486,10 @@ function updateCollectBotOptions() {
   } else if (prev) {
     sel.value = prev;
   }
+}
+function updateCollectBotOptions() {
+  fillBotOptions(document.getElementById("collectBot"));
+  fillBotOptions(document.getElementById("emojiBot"));
 }
 function updateQuotaHint() {
   const hint = document.getElementById("quotaHint");
@@ -496,18 +577,108 @@ document.getElementById("collectBtn").onclick = async () => {
   }
 };
 
+// ---------- 自訂表情面板 ----------
+function renderEmojiPanel() {
+  const panel = document.getElementById("emojiPanel");
+  if (!panel) return;
+  panel.innerHTML = "";
+  if (!emojiList.length) return;
+  emojiList.forEach((em, i) => {
+    const item = document.createElement("button");
+    item.className = "emoji-item";
+    item.type = "button";
+    item.title = em.emoji || "";
+    item.dataset.emojiIdx = i;
+    if (em.kind === "video") {
+      item.innerHTML = `<video src="${em.dataUrl}" muted autoplay loop playsinline width="40" height="40"></video>`;
+    } else if (em.kind === "img") {
+      item.innerHTML = `<img src="${em.dataUrl}" width="40" height="40" />`;
+    } else {
+      // tgs（Lottie）先顯示備援 emoji 字元
+      item.textContent = em.emoji || "❓";
+    }
+    panel.appendChild(item);
+  });
+}
+// 點某顆表情 → 在聚焦文案框游標處插入 <tg-emoji>
+function insertEmoji(em) {
+  if (focusedCaptionId == null || !getPost(focusedCaptionId)) {
+    showToast("先點一下要插入的文案框");
+    return;
+  }
+  const p = getPost(focusedCaptionId);
+  const ta = document.querySelector(`textarea[data-act="caption"][data-id="${focusedCaptionId}"]`);
+  const tag = `<tg-emoji emoji-id="${em.id}">${em.emoji || ""}</tg-emoji>`;
+  let start = p.caption.length, end = p.caption.length;
+  if (ta && typeof ta.selectionStart === "number") { start = ta.selectionStart; end = ta.selectionEnd; }
+  p.caption = p.caption.slice(0, start) + tag + p.caption.slice(end);
+  if (ta) {
+    ta.value = p.caption;
+    const pos = start + tag.length;
+    ta.focus();
+    ta.setSelectionRange(pos, pos);
+    const c = ta.parentElement.querySelector(".counter");
+    if (c) { c.textContent = p.caption.length + " / 1024"; c.classList.toggle("over", p.caption.length > 1024); }
+  }
+  renderPreview();
+  saveSettings();
+}
+document.getElementById("emojiPanel").addEventListener("click", (e) => {
+  const item = e.target.closest(".emoji-item");
+  if (!item) return;
+  const em = emojiList[Number(item.dataset.emojiIdx)];
+  if (em) insertEmoji(em);
+});
+document.getElementById("emojiBtn").onclick = async () => {
+  const sel = document.getElementById("emojiBot");
+  const panel = document.getElementById("emojiPanel");
+  const b = getBot(Number(sel.value));
+  if (!b || !b.token.trim()) { panel.innerHTML = `<div class="res-line res-bad">先在上面填好機器人 token</div>`; return; }
+  panel.innerHTML = `<div class="res-line">讀取中…</div>`;
+  try {
+    const r = await fetch("/api/collect-emojis", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: b.token.trim(), password: document.getElementById("password").value }),
+    });
+    const d = await r.json();
+    if (!d.ok) { panel.innerHTML = `<div class="res-line res-bad">✗ ${d.error}</div>`; return; }
+    if (!d.emojis || !d.emojis.length) {
+      panel.innerHTML = `<div class="res-line res-bad">沒讀到任何自訂表情。請先讓帳號把想用的自訂表情傳給這支 bot，再按一次讀取。</div>`;
+      return;
+    }
+    emojiList = d.emojis;
+    renderEmojiPanel();
+    saveSettings();
+    showToast(`✓ 讀到 ${emojiList.length} 顆表情`);
+  } catch (e) {
+    panel.innerHTML = `<div class="res-line res-bad">連線失敗：${e}</div>`;
+  }
+};
+
 // ---------- localStorage（記住機器人 / 頻道 / 間隔）----------
+function savePostsLocal() {
+  try {
+    localStorage.setItem("tg_posts", JSON.stringify(postsForStorage(true)));
+  } catch (e) {
+    // 影片/圖太大超額 → 退存不含 imageBase64 的版本
+    try { localStorage.setItem("tg_posts", JSON.stringify(postsForStorage(false))); } catch {}
+  }
+}
 function saveSettings() {
   localStorage.setItem("tg_bots", JSON.stringify(bots.map((b) => ({ token: b.token, name: b.name, verified: b.verified }))));
   localStorage.setItem("tg_channels", document.getElementById("channels").value);
   localStorage.setItem("tg_interval", document.getElementById("interval").value);
   localStorage.setItem("tg_totalquota", document.getElementById("totalQuota").value);
+  savePostsLocal();
+  try { localStorage.setItem("tg_emojis", JSON.stringify(emojiList)); } catch {}
 }
 function loadSettings() {
   const savedBots = localStorage.getItem("tg_bots");
   const c = localStorage.getItem("tg_channels");
   const i = localStorage.getItem("tg_interval");
   const q = localStorage.getItem("tg_totalquota");
+  const savedPosts = localStorage.getItem("tg_posts");
+  const savedEmojis = localStorage.getItem("tg_emojis");
   if (savedBots) {
     try {
       const arr = JSON.parse(savedBots);
@@ -517,6 +688,18 @@ function loadSettings() {
   if (c) document.getElementById("channels").value = c;
   if (i) document.getElementById("interval").value = i;
   if (q) document.getElementById("totalQuota").value = q;
+  if (savedPosts) {
+    try {
+      const arr = JSON.parse(savedPosts);
+      if (Array.isArray(arr) && arr.length) posts = arr.map(hydratePost);
+    } catch {}
+  }
+  if (savedEmojis) {
+    try {
+      const arr = JSON.parse(savedEmojis);
+      if (Array.isArray(arr)) emojiList = arr;
+    } catch {}
+  }
 }
 
 // ---------- 渲染貼文卡 ----------
@@ -596,7 +779,7 @@ function renderPreview() {
         ${p.imageBase64 ? (p.mediaType === "video"
           ? `<video class="tg-img" src="${p.imageBase64}" muted autoplay loop playsinline></video>`
           : `<img class="tg-img" src="${p.imageBase64}" />`) : ""}
-        ${p.caption ? `<div class="tg-body"><div class="tg-caption">${p.caption.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div></div>` : ""}
+        ${p.caption ? `<div class="tg-body"><div class="tg-caption">${captionToPreview(p.caption)}</div></div>` : ""}
         ${chunkRows(btns, p.btnPerRow || 1).map((row) =>
           `<div class="tg-btn-row">${row.map((b) => `<div class="tg-btn">${b.text.replace(/</g, "&lt;")}</div>`).join("")}</div>`
         ).join("")}
@@ -666,6 +849,20 @@ document.getElementById("posts").addEventListener("change", (e) => {
   if (e.target.dataset.act === "pin") getPost(Number(e.target.dataset.id)).pin = e.target.checked;
   if (e.target.dataset.act === "perrow") { getPost(Number(e.target.dataset.id)).btnPerRow = Number(e.target.value); renderPreview(); }
 });
+// 追蹤目前聚焦的文案框（插入自訂表情時用）
+document.getElementById("posts").addEventListener("focusin", (e) => {
+  if (e.target.dataset.act === "caption") focusedCaptionId = Number(e.target.dataset.id);
+});
+// 按鈕連結失焦時自動正規化成合法網址
+document.getElementById("posts").addEventListener("focusout", (e) => {
+  if (e.target.dataset.act !== "btnurl") return;
+  const p = getPost(Number(e.target.dataset.id));
+  const bi = Number(e.target.dataset.bi);
+  if (!p || !p.buttons[bi]) return;
+  const norm = normalizeUrl(e.target.value);
+  if (norm !== e.target.value) { e.target.value = norm; p.buttons[bi].url = norm; }
+  saveSettings();
+});
 
 document.getElementById("addPost").onclick = () => { posts.push(newPost()); renderPosts(); };
 
@@ -728,8 +925,9 @@ const savedPw = localStorage.getItem("tg_password");
 if (savedPw) document.getElementById("password").value = savedPw;
 if (!bots.length) bots.push(newBot());
 renderBots();
-posts.push(newPost());
+if (!posts.length) posts.push(newPost());
 renderPosts();
+renderEmojiPanel();
 // 有密碼就自動拉雲端設定（換電腦打開輸入密碼後也會自動帶回）
 if (savedPw) loadFromCloud(true);
 
@@ -752,6 +950,8 @@ function currentConfig() {
     channels: document.getElementById("channels").value,
     interval: document.getElementById("interval").value,
     totalQuota: document.getElementById("totalQuota").value,
+    posts: postsForStorage(true),
+    emojis: emojiList,
   };
 }
 function applyConfig(d) {
@@ -761,7 +961,13 @@ function applyConfig(d) {
   if (typeof d.channels === "string") document.getElementById("channels").value = d.channels;
   if (d.interval) document.getElementById("interval").value = d.interval;
   if (d.totalQuota) document.getElementById("totalQuota").value = d.totalQuota;
+  if (Array.isArray(d.posts)) {
+    posts = d.posts.length ? d.posts.map(hydratePost) : [newPost()];
+  }
+  if (Array.isArray(d.emojis)) emojiList = d.emojis;
   renderBots();
+  renderPosts();
+  renderEmojiPanel();
   saveSettings();
 }
 async function saveToCloud() {
@@ -800,12 +1006,7 @@ document.getElementById("password").addEventListener("blur", () => {
 });
 
 document.getElementById("exportBtn").onclick = () => {
-  const data = {
-    bots: bots.map((b) => ({ token: b.token, name: b.name, verified: b.verified })),
-    channels: document.getElementById("channels").value,
-    interval: document.getElementById("interval").value,
-    totalQuota: document.getElementById("totalQuota").value,
-  };
+  const data = currentConfig();
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -826,13 +1027,7 @@ document.getElementById("importBtn").onclick = () => {
     reader.onload = () => {
       try {
         const d = JSON.parse(reader.result);
-        if (Array.isArray(d.bots) && d.bots.length)
-          bots = d.bots.map((b) => ({ id: ++botRowId, token: b.token || "", name: b.name || "", verified: !!b.verified }));
-        if (typeof d.channels === "string") document.getElementById("channels").value = d.channels;
-        if (d.interval) document.getElementById("interval").value = d.interval;
-        if (d.totalQuota) document.getElementById("totalQuota").value = d.totalQuota;
-        renderBots();
-        saveSettings();
+        applyConfig(d);
         showToast("✓ 已匯入設定");
       } catch {
         showToast("✗ 檔案格式不對");

@@ -108,6 +108,81 @@ app.post("/api/collect-ids", async (req, res) => {
   }
 });
 
+// ---- 收集自訂表情：讀取互動訊息裡的 custom_emoji，抓回真實表情圖 ----
+// token 只在後端使用，不外洩到前端
+app.post("/api/collect-emojis", async (req, res) => {
+  if (!checkPassword(req, res)) return;
+  const { token } = req.body;
+  if (!token) return res.json({ ok: false, error: "沒填 token" });
+  try {
+    const r = await fetch(TG(token, "getUpdates") + "?limit=100");
+    const data = await r.json();
+    if (!data.ok) return res.json({ ok: false, error: data.description });
+
+    // 1) 掃各訊息的 entities / caption_entities，取 custom_emoji（用 Map 依 id 去重）
+    const map = new Map(); // custom_emoji_id -> 備援 emoji 字元
+    for (const u of data.result) {
+      const msg =
+        u.message || u.edited_message || u.channel_post || u.edited_channel_post;
+      if (!msg) continue;
+      const text = msg.text || msg.caption || "";
+      const ents = msg.entities || msg.caption_entities || [];
+      for (const e of ents) {
+        if (e.type === "custom_emoji" && e.custom_emoji_id) {
+          if (!map.has(e.custom_emoji_id)) {
+            const fallback = text.slice(e.offset, e.offset + e.length);
+            map.set(e.custom_emoji_id, fallback);
+          }
+        }
+      }
+    }
+    const ids = [...map.keys()];
+    if (!ids.length) return res.json({ ok: true, emojis: [] });
+
+    // 2) 取每顆貼圖的 file_id / 型別（getCustomEmojiStickers 一次上限 200 顆）
+    const stickers = [];
+    for (let i = 0; i < ids.length; i += 200) {
+      const batch = ids.slice(i, i + 200);
+      const sr = await fetch(
+        TG(token, "getCustomEmojiStickers") +
+          "?custom_emoji_ids=" +
+          encodeURIComponent(JSON.stringify(batch))
+      );
+      const sd = await sr.json();
+      if (sd.ok && Array.isArray(sd.result)) stickers.push(...sd.result);
+    }
+
+    // 3) 逐顆 getFile 取 file_path，下載檔案轉 base64 data URL
+    const emojis = [];
+    for (const s of stickers) {
+      const id = s.custom_emoji_id;
+      const emojiChar = s.custom_emoji || map.get(id) || "";
+      // 依格式決定 mime 與前端渲染型別
+      let kind = "img", mime = "image/webp";
+      if (s.is_video) { kind = "video"; mime = "video/webm"; }
+      else if (s.is_animated) { kind = "tgs"; mime = "application/gzip"; }
+      try {
+        const fr = await fetch(
+          TG(token, "getFile") + "?file_id=" + encodeURIComponent(s.file_id)
+        );
+        const fd = await fr.json();
+        if (!fd.ok || !fd.result || !fd.result.file_path) continue;
+        const dl = await fetch(
+          `https://api.telegram.org/file/bot${token}/${fd.result.file_path}`
+        );
+        const buf = Buffer.from(await dl.arrayBuffer());
+        const dataUrl = `data:${mime};base64,${buf.toString("base64")}`;
+        emojis.push({ id, emoji: emojiChar, dataUrl, kind });
+      } catch (e) {
+        // 單顆下載失敗就跳過
+      }
+    }
+    res.json({ ok: true, emojis });
+  } catch (e) {
+    res.json({ ok: false, error: String(e) });
+  }
+});
+
 // ---- 把一則貼文發到一個頻道 ----
 async function sendOne(token, channel, post) {
   const buttons = (post.buttons || [])
