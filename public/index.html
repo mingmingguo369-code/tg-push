@@ -898,6 +898,54 @@ document.getElementById("posts").addEventListener("input", (e) => {
   if (act === "btntext") { p.buttons[Number(e.target.dataset.bi)].text = e.target.value; renderPreview(); }
   if (act === "btnurl") { p.buttons[Number(e.target.dataset.bi)].url = e.target.value; }
 });
+// 貼上時保留自訂表情：從剪貼簿 HTML 把 <tg-emoji>/<img> 帶的表情 id 還原成 <tg-emoji> 標籤
+// （純 textarea 預設貼上只吃純文字→自訂表情會掉成 fallback 原字；這裡攔截補回）
+function htmlToCaptionWithEmoji(html) {
+  const box = document.createElement("div");
+  box.innerHTML = html;
+  let out = "";
+  const idAttrs = ["emoji-id", "data-document-id", "data-doc-id", "data-custom-emoji-id",
+                   "document-id", "data-unique-id", "data-entity-id"];
+  (function walk(node) {
+    node.childNodes.forEach((n) => {
+      if (n.nodeType === 3) { out += n.nodeValue; return; }        // 純文字
+      if (n.nodeType !== 1) return;
+      const tag = n.tagName.toLowerCase();
+      let id = "";
+      for (const a of idAttrs) { const v = n.getAttribute && n.getAttribute(a); if (v && /^\d{5,}$/.test(v)) { id = v; break; } }
+      if (id && (tag === "tg-emoji" || tag === "img" || tag === "span")) {
+        const fb = (n.getAttribute && n.getAttribute("alt")) || n.textContent || "";
+        out += `<tg-emoji emoji-id="${id}">${fb}</tg-emoji>`;
+        return;
+      }
+      if (tag === "br") { out += "\n"; return; }
+      walk(n);                                                     // 其他元素→取內文
+    });
+  })(box);
+  return out;
+}
+document.getElementById("posts").addEventListener("paste", (e) => {
+  const t = e.target;
+  if (!t || t.dataset.act !== "caption") return;
+  const cd = e.clipboardData || window.clipboardData;
+  if (!cd) return;
+  let html = "";
+  try { html = cd.getData("text/html") || ""; } catch (_) { html = ""; }
+  if (!html || !/tg-emoji|emoji-id|document-id|doc-id|custom-emoji-id/i.test(html)) return; // 沒自訂表情→用瀏覽器預設貼上
+  const conv = htmlToCaptionWithEmoji(html);
+  if (!conv || !/<tg-emoji emoji-id="\d+">/.test(conv)) return;    // 轉不出表情→預設貼上
+  e.preventDefault();
+  const start = t.selectionStart, end = t.selectionEnd;
+  t.value = t.value.slice(0, start) + conv + t.value.slice(end);
+  const pos = start + conv.length;
+  try { t.setSelectionRange(pos, pos); } catch (_) {}
+  const p = getPost(Number(t.dataset.id));
+  if (p) {
+    p.caption = t.value; renderPreview();
+    const c = t.parentElement.querySelector(".counter");
+    if (c) { const vl = visibleLength(p.caption); c.textContent = vl + " / 1024"; c.classList.toggle("over", vl > 1024); }
+  }
+});
 document.getElementById("posts").addEventListener("change", (e) => {
   if (e.target.dataset.act === "pin") getPost(Number(e.target.dataset.id)).pin = e.target.checked;
   if (e.target.dataset.act === "perrow") { getPost(Number(e.target.dataset.id)).btnPerRow = Number(e.target.value); renderPreview(); }
